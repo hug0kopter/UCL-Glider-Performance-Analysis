@@ -2,7 +2,7 @@ clc
 clear all
 close all
 %% Input Constants:(Run this section if any of the constants need updating)
-%1111
+
 %general
 rho_SW=1027; %salt water density
 WingArea=1.112; % Planar wing area looking from the top (reference area)
