@@ -214,34 +214,50 @@ end
 
 %Find the seperation between Pos and Neg
 UsefullAOA = round(UsefullAOA,3);
-LB = find(UsefullAOA==uselessAOARange(1)); %
-UB = find(UsefullAOA==uselessAOARange(2));
+LB = find(UsefullAOA==uselessAOARange(1)); % Lower boundary of the AoA range (Separation point right before the lowest AoA when diving)
+UB = find(UsefullAOA==uselessAOARange(2)); % Upper boundary of the AoA range
 
-%Split and reform the data
+% Splitting the dataset, removing the AoAs when the glider drops vertically
+% and then combining them again:
 UsefullAOA=[UsefullAOA(1:LB-1);UsefullAOA(UB:end)];
-velocity_matrix=[velocity_matrix(1:LB-1,:);velocity_matrix(UB:end,:)];
-L_NBandAOA=[L_NBandAOA(1:LB-1,:);L_NBandAOA(UB:end,:)];
-B_NBandAOA=[B_NBandAOA(1:LB-1,:);B_NBandAOA(UB:end,:)];
-theta_NBandAOA=[theta_NBandAOA(1:LB-1,:);theta_NBandAOA(UB:end,:)];
-U_NBandAOA=[U_NBandAOA(1:LB-1,:);U_NBandAOA(UB:end,:)];
-W_NBandAOA=[W_NBandAOA(1:LB-1,:);W_NBandAOA(UB:end,:)];
-horizontal_distance_travelled=[horizontal_distance_travelled(1:LB-1,:);horizontal_distance_travelled(UB:end,:)];
-movingDperL=[movingDperL(1:LB-1,:);movingDperL(UB:end,:)];
-NB_in_litres=[NB_in_litres(1:LB-1,:);NB_in_litres(UB:end,:)];
-checkAOA0=find(UsefullAOA==0);
+
+velocity_matrix = [velocity_matrix(1:LB-1,:);velocity_matrix(UB:end,:)];
+
+L_NBandAOA = [L_NBandAOA(1:LB-1,:);L_NBandAOA(UB:end,:)];
+
+B_NBandAOA = [B_NBandAOA(1:LB-1,:);B_NBandAOA(UB:end,:)];
+
+theta_NBandAOA = [theta_NBandAOA(1:LB-1,:);theta_NBandAOA(UB:end,:)];
+
+U_NBandAOA = [U_NBandAOA(1:LB-1,:);U_NBandAOA(UB:end,:)];
+
+W_NBandAOA = [W_NBandAOA(1:LB-1,:);W_NBandAOA(UB:end,:)];
+
+horizontal_distance_travelled = [horizontal_distance_travelled(1:LB-1,:);horizontal_distance_travelled(UB:end,:)];
+
+movingDperL = [movingDperL(1:LB-1,:);movingDperL(UB:end,:)];
+
+NB_in_litres = [NB_in_litres(1:LB-1,:);NB_in_litres(UB:end,:)];
+
+checkAOA0 = find(UsefullAOA==0);
 %% Graph stage
-%general change
+% Specifying the domain and range for the plots (x and y values)
 generalYlim=[0,0.2];
 generalXlim=[0,1];
 generalXlim2=[-1,0];
-F1P2start=0;%Figure1 series part 2 that draw the aoa range starting point adjustment
+
+F1P2start = 20; %To adjust the starting point for the 5 polar curves on figure 1 and 8,
+% alter this number, the curves plotted will be in 0.2 degrees increment
+% if u want to have a look at a certain range of angles just keep
+% increasing this variable until you see it.
+
     end % here to run the process stage
-%% Positive part which is for dive
-%%
+%% The following section and all its plots are for positive AoA's which means the glider is diving
+%
+%% Figure1: glider polar in dive
 figure(1) 
 hold on
 grid on
-% change if need negtive part
 % xlim([-1,1])
 xlim(generalXlim)
 ylim(generalYlim)
@@ -254,13 +270,13 @@ STRNB2=append('NetB=',num2str(NB(i)),'N');
 Leg{i}=STRNB2;
 end
 
-% change if need negtive part
 istart=LB+F1P2start;
 for i=istart:istart+5% Here can chane for the amount of AOA lines needed
 plot([0,U_NBandAOA(i,:)],[0,W_NBandAOA(i,:)],'--')
 STRAOA2=append('AOA=',num2str(UsefullAOA(i)),'deg');
 Leg{i-istart+1+length(NB)}=STRAOA2;% Continue the Legend after the part1
 end
+
 %legend(Leg,'NumColumns',1,'Location','bestoutside','Box','off')
 legend(Leg,'NumColumns',1,'Location','northwest','Box','off')
 title('Glide polar for dive')
@@ -296,7 +312,7 @@ figure(4)
 hold on
 contourf(NB,UsefullAOA(LB:end),movingDperL(LB:end,:))
 colorbar
-title('The distance per dive every Liter change m/L')
+title('The distance per dive per VBD volume change [m/L]')
 ylabel('AOA alpha deg')
 xlabel('Net Buoyance change N')
 %%
@@ -309,7 +325,7 @@ MDL1=movingDperL(LB:end,:)./1000;
 SpeedNBAOA1=velocity_matrix(LB:end,:);
 plot3(MDL1,SpeedNBAOA1,AOA1)
 ylim([0,1])
-xlabel('The distance per dive every Liter change km')
+xlabel('The distance per dive per VBD volume change [km/L]')
 ylabel('General Speed m/s')
 zlabel('AOA alpha deg')
 Leg5=Leg2(1:length(Leg2)-1);%need to run graph2 first
@@ -328,7 +344,7 @@ yline(0,'b--')
 Leg6{length(NB)+1}='zero line';
 %legend(Leg6,'NumColumns',1,'Location','bestoutside','Box','off')
 legend(Leg6,'NumColumns',1,'Box','off')
-title('Glide angle plot for dive')
+title('Glide angle vs. AoA plot for dive')
 ylabel('Glide Angle Beta deg')
 xlabel('AOA alpha deg')
 %%
@@ -412,7 +428,7 @@ figure(11)
 hold on
 contourf(NB,UsefullAOA(1:LB-1),-movingDperL(1:LB-1,:))
 colorbar
-title('The distance per rise every Liter change m/L')
+title('The distance per rise per VBD volume change [m/L]')
 ylabel('AOA alpha deg')
 xlabel('Net Buoyance change N')
 %%
@@ -424,7 +440,7 @@ MDL1=-movingDperL(1:LB-1,:)./1000;
 SpeedNBAOA1=velocity_matrix(1:LB-1,:);
 plot3(MDL1,SpeedNBAOA1,AOA1)
 ylim([0,1])
-xlabel('The distance per rise every Liter change km')
+xlabel('The distance per rise per VBD volume change [km/L]')
 ylabel('General Speed m/s')
 zlabel('AOA alpha deg')
 Leg12=Leg9(1:length(Leg9)-1);
@@ -469,51 +485,51 @@ ylabel('General Speed m/s')
 zlabel('NB')
 title('Positive Part')
 legend(Leg14,'NumColumns',1,'Location','northeast','Box','off')
-%% Energy Calc
-TPCHalf=Depth1./W_NBandAOA;
-DPCHalf=abs(horizontal_distance_travelled);
-% DPLHalf=abs(movingDperL)./2;%This need to change as the NB now is coupled
-NBinLHalf=NB_in_litres;%in L
-AX_EHalf=P1.*TPCHalf;%Ws
-%general calculating the terms
-BEVolume=(Total_NB.*0.1.*2./rho_SW);%m3
+%% Energy Calculations
 
-BE_E=(PressureSurface+PressureBottom).*BEVolume./EtaBE;%Nm
+TPC_matrix = Depth1./W_NBandAOA; %Time per dive/rise
+DPC_matric = abs(horizontal_distance_travelled); %Distance per dive/rise
+AX_E = P1.*TPC_matrix;% Power consumed due to ambient current draw (no actuators) in Joules
+
+%Flow Work calculations
+BEVolume = (Total_NB.*0.1.*2./rho_SW);% buoyancy engine volume in m3
+BE_E = (PressureSurface+PressureBottom).*BEVolume./EtaBE;% Energy consumed by VBD per cycle (dive+rise) in Joules
+
 %Energy calculation
 %Setting up the 4D dataset
-AOAP=UsefullAOA(LB:end);
-AOAN=UsefullAOA(1:LB-1);
+AOAP = UsefullAOA(LB:end); %positive angles of attack (meaning in dive)
+AOAN = UsefullAOA(1:LB-1);%negative angles of attack (meaning in rise)
+AXE_AOAP_NB = AX_E(LB:end,:); % ambient energy drawn when going down
+AXE_AOAN_NB = AX_E(1:LB-1,:); % ambient energy drawn when going up
+DPC_AOAP_NB = DPC_matric(LB:end,:);% distance per cycle going down (diving)
+DPC_AOAN_NB = DPC_matric(1:LB-1,:);% distance per cycle going up (rising)
+TPC_AOAP_NB = TPC_matrix(LB:end,:);% time per dive
+TPC_AOAN_NB = TPC_matrix(1:LB-1,:);% time per rise
 
-AXEHalf_AOAP_NB=AX_EHalf(LB:end,:);
-AXEHalf_AOAN_NB=AX_EHalf(1:LB-1,:);
-DPCHalf_AOAP_NB=DPCHalf(LB:end,:);
-DPCHalf_AOAN_NB=DPCHalf(1:LB-1,:);
-% DPLHalf_AOAP_NB=DPLHalf(LB:end,:);
-% DPLHalf_AOAN_NB=DPLHalf(1:LB-1,:);
-TPCHalf_AOAP_NB=TPCHalf(LB:end,:);
-TPCHalf_AOAN_NB=TPCHalf(1:LB-1,:);
-
+% This for loop adds each of the matricies with the same matrix but flipped
+% around NB axis, this means that we can calculate total energy consumption
+% per cycle, making sure that all combination of NB in dive and NB in rise
+% add to the total VBD volume.
 for iAXE=1:length(AOAN)
-%debugAXE1=AXEHalf_AOAN_NB(iAXE,:);
-tempAXE=AXEHalf_AOAP_NB+fliplr(AXEHalf_AOAN_NB(iAXE,:));
-tempDPC=DPCHalf_AOAP_NB+fliplr(DPCHalf_AOAN_NB(iAXE,:));
-% tempDPL=DPLHalf_AOAP_NB+fliplr(DPLHalf_AOAN_NB(iAXE,:));
-tempDPL=tempDPC./Total_NB;
-tempTPC=TPCHalf_AOAP_NB+fliplr(TPCHalf_AOAN_NB(iAXE,:));
-AXE_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempAXE;
-TotalE_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempAXE+BE_E;
-DPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempDPC;
-DPL_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempDPL;
-TPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempTPC;
+    %debugAXE1=AXEHalf_AOAN_NB(iAXE,:);
+    tempAXE = AXE_AOAP_NB + fliplr(AXE_AOAN_NB(iAXE,:)); % summing 
+    tempDPC = DPC_AOAP_NB + fliplr(DPC_AOAN_NB(iAXE,:));
+    tempDPL = tempDPC./Total_NB;
+    tempTPC = TPC_AOAP_NB + fliplr(TPC_AOAN_NB(iAXE,:));
+    AXE_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempAXE;
+    TotalE_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempAXE + BE_E;
+    DPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempDPC;
+    DPL_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempDPL;
+    TPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempTPC;
 end
 %calculating other further terms
 
-NumOfC_AOAP_AOAN_NB3DMatrix=BatteryE./TotalE_AOAP_AOAN_NB3DMatrix;
-TotalD_AOAP_AOAN_NB3DMatrix=DPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./1000;
-[XAOAN,YAOAP,ZNB]=meshgrid(AOAN,AOAP,NB);
+NumOfC_AOAP_AOAN_NB3DMatrix = BatteryE./TotalE_AOAP_AOAN_NB3DMatrix; %number of cycles 3D matrix
+TotalD_AOAP_AOAN_NB3DMatrix = DPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./1000;% total distance 3D matrix
 
-TotalTime_AOAP_AOAN_NB3DMatrix=TPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./3600./168;
-Power1_AOAP_AOAN_NB3DMatrix=TotalE_AOAP_AOAN_NB3DMatrix./TPC_AOAP_AOAN_NB3DMatrix;
+TotalTime_AOAP_AOAN_NB3DMatrix = TPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./3600./168;% total mission time 3D matrix
+Power1_AOAP_AOAN_NB3DMatrix = TotalE_AOAP_AOAN_NB3DMatrix./TPC_AOAP_AOAN_NB3DMatrix; % Average power draw matrix for each configuration [W]
+[XAOAN,YAOAP,ZNB] = meshgrid(AOAN,AOAP,NB);
 %%Graphic part2
 %%
 %THIS IS A 4D GRAPH
