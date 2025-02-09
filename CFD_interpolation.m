@@ -2,51 +2,32 @@ clc
 clear all
 close all
 
-rho_SW=1025;
-WingArea=1.235;%change base on your wing
-folderPath='Put_The_Data_Here/MECHSPACE_XFLR5/';
+rho_SW=1027;
+WingArea=1.112;%change base on your wing
+folderPath='Put_The_Data_Here/CFD/';
 FileList=dir(folderPath);
 FileList=FileList(4:end);
-NumberOfFiles=length(FileList);
-TemplateAOA=transpose(linspace(-10,10,101));
-length(TemplateAOA)
-SpeedList=[];
-BlankSpeedList=zeros(1,NumberOfFiles);
-TableSpaceRef=zeros(length(TemplateAOA),NumberOfFiles);
-AoAdebuglist=zeros(length(TemplateAOA),1);
-CDatSandAOA=zeros(length(TemplateAOA),1);
-CLatSandAOA=zeros(length(TemplateAOA),1);
+SpeedList=[0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];
+Total_NB=14;
+NB=[3,4,5,6,7,8,9,10,11];% here is the NB value you want to have a look can change and play
 
-for i=1:NumberOfFiles
-   
-    FileName=append(folderPath,FileList(i).name);
-    F1=importdata(FileName);
-    Temp1=split(FileList(i).name,'-');
-    Temp2=split(Temp1(2),' ');
-    Temp3=split(Temp2(1),'_');
-    speed=str2num(cell2mat(append(Temp3(1),'.',Temp3(2))));
+NumberOfSpeed=length(SpeedList);
+TemplateAOA=transpose(linspace(-7,7,15));
+% length(TemplateAOA)
+
+TableSpaceRef=zeros(length(TemplateAOA),NumberOfSpeed);
+
+FileName1=append(folderPath,FileList(1).name);
+FileName2=append(folderPath,FileList(2).name);
+FileName3=append(folderPath,FileList(3).name);
+
+
+AoAdebuglist=importdata(FileName1);
+CDatSandAOA=importdata(FileName2);
+CLatSandAOA=importdata(FileName3);
     
-    TempAOA=F1.data(:,1);
-    TempCD=F1.data(:,6);
-    TempCL=F1.data(:,3);
-    for j=1:101
-        R1=round(TemplateAOA(j),3);
-        R2=round(TempAOA(1),3);
-        if R1==R2
-            j1=j;
-            break
-        end    
-    end
-  
-    SpeedList=[SpeedList,speed];
-    AoAdebuglist=[AoAdebuglist,[AoAdebuglist(1:j1-1,i);TempAOA;AoAdebuglist(j1+length(TempCD):length(TemplateAOA),i)]];
-    CDatSandAOA=[CDatSandAOA,[CDatSandAOA(1:j1-1,i);TempCD;CDatSandAOA(j1+length(TempCD):length(TemplateAOA),i)]];
-    CLatSandAOA=[CLatSandAOA,[CLatSandAOA(1:j1-1,i);TempCL;CLatSandAOA(j1+length(TempCD):length(TemplateAOA),i)]];
-    
-end
-AoAdebuglist(:,1)=[];
-CDatSandAOA(:,1)=[];
-CLatSandAOA(:,1)=[];
+
+
 TempDatSandAOA=1/2.*CDatSandAOA.*rho_SW*WingArea;
 TempLatSandAOA=1/2.*CLatSandAOA.*rho_SW*WingArea;
 DatSandAOA=[];
@@ -62,16 +43,16 @@ NB_Speed_Relationship=repmat(struct(),[length(TemplateAOA),1]);
 UsefullAOARange=[];
 for i=1:length(TemplateAOA)
 NBForAOAi=NBatSandAOA(i,:);
-if NBForAOAi ~= BlankSpeedList
-kN0=find(NBForAOAi);
-if length(kN0)>=1/2*length(SpeedList)
-if i>16 && i<86
 UsefullAOARange=[UsefullAOARange,i];
 y=transpose(SpeedList);
 y2=transpose(LatSandAOA(i,:));
 x=transpose(NBatSandAOA(i,:));
+if i==7
+xu=[x(1);x(2);x(3);x(5)];
+y2u=[y2(1);y2(2);y2(3);y2(5)];
+end 
 f = fittype('a1*exp(b1*x) + a2*exp(b2*x) ');
-start_point = [0.895, 0.1672, -0.1, -1]; 
+start_point = [-0.4, 0.5, 0, 0]; 
 fit_options = fitoptions('Method','NonlinearLeastSquares','StartPoint', start_point,'Algorithm','Levenberg-Marquardt'); 
 [fit_result, gof] = fit(x, y, f, fit_options); 
 disp(fit_result);
@@ -80,28 +61,30 @@ NB_Speed_Relationship(i).FitFunction=fit_result;
 disp('请检查拟合结果，Please check the fit result')
 
 f2 = fittype('poly1');
+if i==7
+[fit_result2, gof2] = fit(xu, y2u, f2); 
+else
 [fit_result2, gof2] = fit(x, y2, f2); 
+end
 disp(fit_result2);
 plot(fit_result2,x,y2);
 NB_Speed_Relationship(i).FitFunction2=fit_result2;
 disp('请检查拟合结果2，Please check the fit result2')
 end
-end
-end
-end
+
 close all 
-save('DAW_MST1_RAM')
+save('CFD_interpolation_RAM')
 clear
 %%
 clear
-load('DAW_MST1_RAM.mat')
+load('CFD_interpolation_RAM.mat')
 if true % to run the entire plot section
 close all
-NB=[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20];% here is the NB value you want to have a look can change and play
-Depth1=500;
-UsefullAOARange=UsefullAOARange(4:end);%debug if imag
-UsefullAOA=TemplateAOA(UsefullAOARange);
-UsefullNBSR=NB_Speed_Relationship(UsefullAOARange);
+
+NBdown=Total_NB-NB;
+Depth1=200;
+UsefullAOA=TemplateAOA;%(UsefullAOARange);
+UsefullNBSR=NB_Speed_Relationship;%(UsefullAOARange);
 SpeedatNBandAOA=zeros(length(UsefullAOA),length(NB));
 LatNBandAOA=zeros(length(UsefullAOA),length(NB));
 BetaatNBandAOA=zeros(length(UsefullAOA),length(NB));
@@ -126,8 +109,8 @@ end
 end
 
 % %put the useless AOA range here
-UsefullAOA=round(UsefullAOA,3);
-uselessAOARange=[-2.8,-1.2];
+% UsefullAOA=round(UsefullAOA,3);
+uselessAOARange=[-1,0];
 LB=find(UsefullAOA==uselessAOARange(1));
 UB=find(UsefullAOA==uselessAOARange(2));
 
@@ -251,8 +234,8 @@ figure(13)
 hold on
 grid on
 Leg13=cell(1,1);
-AOA1Start=LB+10;
-AOA1end=LB+17;
+AOA1Start=LB;
+AOA1end=LB+7;
 AOA1=UsefullAOA(AOA1Start:AOA1end);
 for i13=1:length(AOA1)
 STRAOA13=append('AOA=',num2str(AOA1(i13)),'deg');
@@ -391,8 +374,8 @@ figure(14)
 hold on
 grid on
 Leg13=cell(1,1);
-AOA1Start=LB-17;
-AOA1end=LB-10;
+AOA1Start=LB-6;
+AOA1end=LB-1;
 AOA1=UsefullAOA(AOA1Start:AOA1end);
 for i13=1:length(AOA1)
 STRAOA13=append('AOA=',num2str(AOA1(i13)),'deg');
@@ -419,7 +402,7 @@ DPLHalf=abs(movingDperL)./2;
 AX_EHalf=P1.*TPCHalf;%Ws
 PressureSurface=1e5;
 PressureBottom=20e5;
-BEVolume=(NB.*0.1.*2./rho_SW);%m3
+BEVolume=(Total_NB.*0.1.*2./rho_SW);%m3
 EtaBE=0.35;
 BE_E=(PressureSurface+PressureBottom).*BEVolume./EtaBE;%Nm
 
@@ -437,10 +420,10 @@ TPCHalf_AOAN_NB=TPCHalf(1:LB-1,:);
 
 for iAXE=1:length(AOAN)
 %debugAXE1=AXEHalf_AOAN_NB(iAXE,:);
-tempAXE=AXEHalf_AOAP_NB+AXEHalf_AOAN_NB(iAXE,:);
-tempDPC=DPCHalf_AOAP_NB+DPCHalf_AOAN_NB(iAXE,:);
-tempDPL=DPLHalf_AOAP_NB+DPLHalf_AOAN_NB(iAXE,:);
-tempTPC=TPCHalf_AOAP_NB+TPCHalf_AOAN_NB(iAXE,:);
+tempAXE=AXEHalf_AOAP_NB+fliplr(AXEHalf_AOAN_NB(iAXE,:));
+tempDPC=DPCHalf_AOAP_NB+fliplr(DPCHalf_AOAN_NB(iAXE,:));
+tempDPL=DPLHalf_AOAP_NB+fliplr(DPLHalf_AOAN_NB(iAXE,:));
+tempTPC=TPCHalf_AOAP_NB+fliplr(TPCHalf_AOAN_NB(iAXE,:));
 AXE_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempAXE;
 TotalE_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempAXE+BE_E;
 DPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:)=tempDPC;
@@ -513,18 +496,18 @@ title('Num of cycles 4D contourplot')
 %%
 figure(21)
 hold on
-contourf(AOAN,AOAP,TotalD_AOAP_AOAN_NB3DMatrix(:,:,5))
+contourf(AOAN,AOAP,TotalD_AOAP_AOAN_NB3DMatrix(:,:,6))
 c21=colorbar;
 c21.Label.String='Total Distant per battery charge km';
-title('Total Distant 4D contourplot section on NB=10N')
+title('Total Distant 4D contourplot section on NB=8N')
 xlabel('AOAN for rise alphaN deg')
 ylabel('AOAP for dive alphaP deg')
 figure(22)
 hold on
-contourf(AOAN,AOAP,TotalTime_AOAP_AOAN_NB3DMatrix(:,:,5))
+contourf(AOAN,AOAP,TotalTime_AOAP_AOAN_NB3DMatrix(:,:,6))
 c22=colorbar;
 c22.Label.String='Total Time per battery charge week';
-title('Total Time 4D contourplot section on NB=10N')
+title('Total Time 4D contourplot section on NB=8N')
 xlabel('AOAN for rise alphaN deg')
 ylabel('AOAP for dive alphaP deg')
 figure(23)
@@ -618,6 +601,6 @@ ylabel('AOAP for dive alphaP deg')
 % c17=colorbar;
 % c17.Label.String='Total Distant per battery charge km';
 % %volumeViewer(TotalD_AOAP_AOAN_NB3DMatrix)
-% 
+
 
 end

@@ -5,53 +5,63 @@ close all
 
 %general
 rho_SW=1027; %salt water density
-WingArea=1.112;%change base on your wing
+WingArea=1.112; % Planar wing area looking from the top (reference area)
 
-%Change NB
-%After this line the constents are changeable without rerun the fitting
-Total_NB=14;% Total Capacity of the Buoyancy Engine (Neutral Buoyancy)
-NB=[3,4,5,6,7,8,9,10,11];% here is the NB value you want to have a look can change and play
-Depth1=200;% Set target depth
+% Inputting the Net Buoyancy values for the code to interpolate for
+%If any of the constants need to be changed, just rerun this section. Its
+%not neccesary to rerun the fitting part when the constants here are
+%changed.
+
+Total_NB = 14;% Total volume of the VBD piston
+NB =[3,4,5,6,7,8,9,10,11];% Net buoyancy values for which the lines will be plotted
+Depth1 = 200;% Set target depth
 
 %Data Process
-uselessAOARange=[-2.8,-1.2];% Some aoa around the transit between Pos and Neg will be useless
+uselessAOARange=[-2.8,-1.2];% Removing the AoA between -2.8 and -1.2 
+% because the lift generated is too low causing our glider to fall vertically
 
 %Energy calculation
-P1=1.2;%the aux power in w
-PressureSurface=1e5;%the surf pressure in pa
-PressureBottom=21e5;%the bottom pressure in pa
-EtaBE=0.35;%BE efficiency - estimate
-BatteryE=2000*3600;%total battery cap in Ws - estimates
+P1 = 1.2; %ambient power draw from electronics (not including actuators) [W]
+PressureSurface = 1e5; %Atmospheric pressure at water surface
+PressureBottom = 21e5; %Water pressure at maximum depth
+EtaBE = 0.35; %buoyancy engine efficiency - our estimate
+BatteryE = 1512*3600 ; %total battery capacity in joules - our estimate:
+% 1512 [Wh] * 3600 [s/h]
 
 %4D slicer
-SliceControler=6;%want slice base on which NB index
+SliceControler = 6; %Index of the Net Buoyancy we want to use when descending
+% Net Buoyancy when ascending is calculated by subtracting this from the
+% value of Total_NB, declared above
 
 %% Read Data
 folderPath='Put_The_Data_Here/MECHSPACE_XFLR5/';
 FileList=dir(folderPath);
 FileList=FileList(4:end);
 NumberOfFiles=length(FileList);
-%Declear Spaces
+
+% Declaring empty variables, lists and matricies for storage of later results 
 TemplateAOA=transpose(linspace(-10,10,101));
-SpeedList=[];
-BlankSpeedList=zeros(1,NumberOfFiles);
-TableSpaceRef=zeros(length(TemplateAOA),NumberOfFiles);
-AoAdebuglist=zeros(length(TemplateAOA),1);
-CDatSandAOA=zeros(length(TemplateAOA),1);
-CLatSandAOA=zeros(length(TemplateAOA),1);
+SpeedList=[]; %list of all velocities for which data was collected
+BlankSpeedList = zeros(1,NumberOfFiles);
+TableSpaceRef = zeros(length(TemplateAOA),NumberOfFiles);
+AoAdebuglist = zeros(length(TemplateAOA),1);
+CD_matrix = zeros(length(TemplateAOA),1); %matrix of coefficient of drag values where one dimension is AoA and other is velocity
+CL_matrix = zeros(length(TemplateAOA),1); %matrix of coefficient of lift  values where one dimension is AoA and other is velocity
+
 %Read Each File
 for i=1:NumberOfFiles
     FileName=append(folderPath,FileList(i).name);
     F1=importdata(FileName);
-    %Reconstruct the Speed from Filename
+
+    % Reading the velocity directly from file name
     Temp1=split(FileList(i).name,'-');
     Temp2=split(Temp1(2),' ');
     Temp3=split(Temp2(1),'_');
     speed=str2num(cell2mat(append(Temp3(1),'.',Temp3(2))));
-    
     TempAOA=F1.data(:,1);
     TempCD=F1.data(:,6);
     TempCL=F1.data(:,3);
+
     %Find the starting point of the AOA data
     for j=1:101
         R1=round(TemplateAOA(j),3);
@@ -61,69 +71,96 @@ for i=1:NumberOfFiles
             break
         end    
     end
+    %appending data from each file onto the matricies
     SpeedList=[SpeedList,speed];
     AoAdebuglist=[AoAdebuglist,[AoAdebuglist(1:j1-1,i);TempAOA;AoAdebuglist(j1+length(TempCD):length(TemplateAOA),i)]];
-    CDatSandAOA=[CDatSandAOA,[CDatSandAOA(1:j1-1,i);TempCD;CDatSandAOA(j1+length(TempCD):length(TemplateAOA),i)]];
-    CLatSandAOA=[CLatSandAOA,[CLatSandAOA(1:j1-1,i);TempCL;CLatSandAOA(j1+length(TempCD):length(TemplateAOA),i)]];
+    CD_matrix = [CD_matrix,[CD_matrix(1:j1-1,i);TempCD;CD_matrix(j1+length(TempCD):length(TemplateAOA),i)]];
+    CL_matrix = [CL_matrix,[CL_matrix(1:j1-1,i);TempCL;CL_matrix(j1+length(TempCD):length(TemplateAOA),i)]];
     
 end
-%Remove the first term that is 0
+%Remove the first row of data as it is 0 in the dataset
 AoAdebuglist(:,1)=[];
-CDatSandAOA(:,1)=[];
-CLatSandAOA(:,1)=[];
+CD_matrix(:,1)=[];
+CL_matrix(:,1)=[];
 
-%Calculate L & D
-TempDatSandAOA=1/2.*CDatSandAOA.*rho_SW*WingArea;
-TempLatSandAOA=1/2.*CLatSandAOA.*rho_SW*WingArea;
-DatSandAOA=[];
-LatSandAOA=[];
+%Calculating temporary matricies to be multiplied by velocity at a later
+%stage
+Temporary_Drag_Matrix = 1/2.*CD_matrix.*rho_SW*WingArea; %(1/2)*CD*density*Wing Area
+Temporary_Lift_Matrix = 1/2.*CL_matrix.*rho_SW*WingArea; %(1/2)*CL*density*Wing Area
+drag_matrix=[]; %matrix of drag where the dimensions are velocity and AoA
+lift_matrix=[]; %matrix of lift where the dimensions are velocity and AoA
+
+%multiplying by velocity to calculate actual lift and drag
 for i=1:length(SpeedList)
-DatSandAOA=[DatSandAOA,TempDatSandAOA(:,i).*SpeedList(i).^2];
-LatSandAOA=[LatSandAOA,TempLatSandAOA(:,i).*SpeedList(i).^2];
+drag_matrix=[drag_matrix,Temporary_Drag_Matrix(:,i).*SpeedList(i).^2];
+lift_matrix=[lift_matrix,Temporary_Lift_Matrix(:,i).*SpeedList(i).^2];
 end
-%Find the NetBuoyancy at steady state
-NBatSandAOA=(DatSandAOA.^2+LatSandAOA.^2).^(1/2);
+
+% Calculating net buoyancy for terminal velocity at each of the velocities
+% and AoAs in the dataset
+net_buoyancy_matrix=(drag_matrix.^2+lift_matrix.^2).^(1/2);
+
 %% Reverse relationship calc
-%Set the struct to save relationships
-NB_Speed_Relationship=repmat(struct(),[length(TemplateAOA),1]);
-%Find the valid aoa range
+
+%Set the structure to save relationships
+NB_Speed_Relationship = repmat(struct(),[length(TemplateAOA),1]);
+
+% Processing Data
 UsefullAOARange=[];
 for i=1:length(TemplateAOA)
-    NBForAOAi=NBatSandAOA(i,:);
-    %Non blank check
-    if NBForAOAi ~= BlankSpeedList
-        %Find Zero term index
-        kN0=find(NBForAOAi);
-        %If more than half is zero
-        if length(kN0)>=1/2*length(SpeedList)
-            %Extra limitation for quantitiy normally is +7~-7
+    NB_line = net_buoyancy_matrix(i,:); % read each line of the net buoyancy matrix
+
+    % Checking if the line is not empty (BlankSpeedList is full of zeros)
+    if NB_line ~= BlankSpeedList
+        
+        %Finding indexes of all non-zero values
+        kN0 = find(NB_line); %storing indexes of zero values in a list
+
+        %If more than half of NB_line is not zeros
+        if length(kN0) >= 1/2*length(SpeedList)
+
+            %Using only the lines between the iteration 16 and 86 as they
+            %correspond to the -7 degrees to 7 degress AoA range we are
+            %interested in
             if i>16 && i<86
-                %Save the valid aoa range
+
+                %Saving the valid aoa range
                 UsefullAOARange=[UsefullAOARange,i];
+
                 %Set up the curve fitting environment
-                y=transpose(SpeedList);
-                y2=transpose(LatSandAOA(i,:));
-                x=transpose(NBatSandAOA(i,:));
-                %EXP fit for Speed and NB relationship at different AOA
+                y = transpose(SpeedList);
+                y2 = transpose(lift_matrix(i,:));
+                x = transpose(net_buoyancy_matrix(i,:));
+
+                %Exponential fit for a relationship between Speed and net
+                %buoyancy, for the current angle of attack at current
+                %iteration
                 f = fittype('a1*exp(b1*x) + a2*exp(b2*x) ');
 
-                start_point = [0.895, 0.1672, -0.1, -1]; %Here the staring point need to use the toolbox to find for different dataset
+                %Defining the starting points of the fit for our dataset,
+                %this was determined using datafitting toolbox
+                start_point = [0.895, 0.1672, -0.1, -1]; 
                 
                 fit_options = fitoptions('Method','NonlinearLeastSquares','StartPoint', start_point,'Algorithm','Levenberg-Marquardt');
-                [fit_result, gof] = fit(x, y, f, fit_options);
-                disp(fit_result);
-                plot(fit_result,x,y);
+                [fit_result, gof] = fit(x, y, f, fit_options); %Fitting the curve
+                disp(fit_result); %displaying the equation of the currently fitted curve
+                plot(fit_result,x,y); %showing the fitting plot for visual inspection
+
                 %Save the fit function
-                NB_Speed_Relationship(i).FitFunction=fit_result;
-                disp('请检查拟合结果，Please check the fit result')
-                %Linear fit to get Speed and Lift relationship at different AOA
+                NB_Speed_Relationship(i).FitFunction = fit_result;
+                disp('Please check the fit result') % printing a line after each curve fit for debugging
+
+                %Linear fit to find the relationship between lift and
+                %velocity at the angle of attack of the current loop
+                %iteration
                 f2 = fittype('poly1');
                 [fit_result2, gof2] = fit(x, y2, f2);
-                disp(fit_result2);
-                plot(fit_result2,x,y2);
+                disp(fit_result2); %displaying the equation of the second fit
+                plot(fit_result2,x,y2); %showing the fitting plot for visual inspection
+
                 %Save the fit function
-                NB_Speed_Relationship(i).FitFunction2=fit_result2;
-                disp('请检查拟合结果2，Please check the fit result2')
+                NB_Speed_Relationship(i).FitFunction2 = fit_result2;
+                disp('Please check the fit result2') % printing a line after each curve fit for debugging
             end
         end
     end
@@ -133,58 +170,64 @@ close all
 save('Final_Code_RAM')
 clear
 
-%% Run this part seperatly
+%%
+% loading the fitted curves into the code so that it can be run without 
+% reruning the curve fit every time
 clear
 load('Final_Code_RAM')
-if true %force to run the entire plot section
-    if true %force to run before the process part
+if true %run this section to reload the data and run the entire plotting section
+
+    if true %run this section only to recalculate all data neccesary for the plots without plotting
 %% Process data
 close all
 
-UsefullAOARange=UsefullAOARange(1:end);%debug if imag
-UsefullAOA=TemplateAOA(UsefullAOARange);
-UsefullNBSR=NB_Speed_Relationship(UsefullAOARange);
-%Declear the space
-SpeedatNBandAOA=zeros(length(UsefullAOA),length(NB));
-LatNBandAOA=zeros(length(UsefullAOA),length(NB));
-BetaatNBandAOA=zeros(length(UsefullAOA),length(NB));
-thetaatNBandAOA=zeros(length(UsefullAOA),length(NB));
-UatNBandAOA=zeros(length(UsefullAOA),length(NB));
-WatNBandAOA=zeros(length(UsefullAOA),length(NB));
-movingDistance=zeros(length(UsefullAOA),length(NB));
-movingDperL=zeros(length(UsefullAOA),length(NB));
-NBinLforDPLCalc=zeros(length(UsefullAOA),length(NB));
-%calculate for each term 
-for i=1:length(NB)
-for j=1:length(UsefullAOA)
-    SpeedatNBandAOA(j,i)=feval(UsefullNBSR(j).FitFunction, NB(i));
-    LatNBandAOA(j,i)=feval(UsefullNBSR(j).FitFunction2, NB(i));
-    BetaatNBandAOA(j,i)=acosd(LatNBandAOA(j,i)./NB(i));
-    UatNBandAOA(j,i)=cosd(BetaatNBandAOA(j,i))*SpeedatNBandAOA(j,i);
-    WatNBandAOA(j,i)=sind(BetaatNBandAOA(j,i))*SpeedatNBandAOA(j,i);
-    thetaatNBandAOA(j,i)=BetaatNBandAOA(j,i)-UsefullAOA(j);
-    movingDistance(j,i)=Depth1/tand(BetaatNBandAOA(j,i));
-    movingDperL(j,i)=movingDistance(j,i)/(NB(i)*0.1*2/rho_SW*1000);%in L
-    NBinLforDPLCalc(j,i)=(NB(i)*0.1*2/rho_SW*1000);%in L
-end
+UsefullAOARange = UsefullAOARange(1:end);% for debugging
+UsefullAOA = TemplateAOA(UsefullAOARange); % Range of AoA we interested in (-7 to 7) and excluding the empty results
+UsefullNBSR = NB_Speed_Relationship(UsefullAOARange); % Taking only the fitted curves which correspond with AoA's of interest
+
+%Declare empty matricies for data to be appended later
+velocity_matrix = zeros(length(UsefullAOA),length(NB)); % matrix of velocities with dimensions of net buoyancy and Aoa
+L_NBandAOA = zeros(length(UsefullAOA),length(NB)); % lift matrix
+B_NBandAOA = zeros(length(UsefullAOA),length(NB)); % gliding angle (Beta) matrix
+theta_NBandAOA = zeros(length(UsefullAOA),length(NB)); % pitch angle matrix
+U_NBandAOA = zeros(length(UsefullAOA),length(NB)); % horizontal velocity matrix
+W_NBandAOA = zeros(length(UsefullAOA),length(NB)); % vertical velocity matrixok
+horizontal_distance_travelled = zeros(length(UsefullAOA),length(NB)); %distance per dive/rise matrix
+movingDperL = zeros(length(UsefullAOA),length(NB)); % distance per litre for each AoA and NB
+NB_in_litres = zeros(length(UsefullAOA),length(NB)); % NB in litres for energy calculations
+
+% Calculating all performance characteristics using the trigonometric
+% relationships from the free body diagram
+for i=1:length(NB) % for each net buoyancy value
+    for j=1:length(UsefullAOA)% for each angle of attack of interest
+        velocity_matrix(j,i) = feval(UsefullNBSR(j).FitFunction, NB(i)); % calculating velocity for each NB from fitted curves
+        L_NBandAOA(j,i) = feval(UsefullNBSR(j).FitFunction2, NB(i)); % calculating lift for each NB from fitted curves 
+        B_NBandAOA(j,i) = acosd(L_NBandAOA(j,i)./NB(i)); % calculating lift for each NB from fitted curves = acos(Lift/Net Buoyancy) 
+        U_NBandAOA(j,i) = cosd(B_NBandAOA(j,i))*velocity_matrix(j,i); % calculating horizontal velocity for each NB from fitted curves = cos(Beta)* Velocity) 
+        W_NBandAOA(j,i) = sind(B_NBandAOA(j,i))*velocity_matrix(j,i); % calculating vertical velocity for each NB from fitted curves = sin(Beta)* Velocity)
+        theta_NBandAOA(j,i) = B_NBandAOA(j,i)-UsefullAOA(j); % calculating theta (pitch angle) for each NB from fitted curves = glide angle - AoA
+        horizontal_distance_travelled(j,i) = Depth1/tand(B_NBandAOA(j,i)); % calculating distance travelled horizontally = depth/tan(Beta)
+        movingDperL(j,i) = horizontal_distance_travelled(j,i)/(NB(i)*0.1*2/rho_SW*1000);%  % calculating distance travelled horizontally per litre
+        NB_in_litres(j,i) = (NB(i)*0.1*2/rho_SW*1000);% converting NB to litres
+    end
 end
 
 %Find the seperation between Pos and Neg
-UsefullAOA=round(UsefullAOA,3);
-LB=find(UsefullAOA==uselessAOARange(1));
-UB=find(UsefullAOA==uselessAOARange(2));
+UsefullAOA = round(UsefullAOA,3);
+LB = find(UsefullAOA==uselessAOARange(1)); %
+UB = find(UsefullAOA==uselessAOARange(2));
 
 %Split and reform the data
 UsefullAOA=[UsefullAOA(1:LB-1);UsefullAOA(UB:end)];
-SpeedatNBandAOA=[SpeedatNBandAOA(1:LB-1,:);SpeedatNBandAOA(UB:end,:)];
-LatNBandAOA=[LatNBandAOA(1:LB-1,:);LatNBandAOA(UB:end,:)];
-BetaatNBandAOA=[BetaatNBandAOA(1:LB-1,:);BetaatNBandAOA(UB:end,:)];
-thetaatNBandAOA=[thetaatNBandAOA(1:LB-1,:);thetaatNBandAOA(UB:end,:)];
-UatNBandAOA=[UatNBandAOA(1:LB-1,:);UatNBandAOA(UB:end,:)];
-WatNBandAOA=[WatNBandAOA(1:LB-1,:);WatNBandAOA(UB:end,:)];
-movingDistance=[movingDistance(1:LB-1,:);movingDistance(UB:end,:)];
+velocity_matrix=[velocity_matrix(1:LB-1,:);velocity_matrix(UB:end,:)];
+L_NBandAOA=[L_NBandAOA(1:LB-1,:);L_NBandAOA(UB:end,:)];
+B_NBandAOA=[B_NBandAOA(1:LB-1,:);B_NBandAOA(UB:end,:)];
+theta_NBandAOA=[theta_NBandAOA(1:LB-1,:);theta_NBandAOA(UB:end,:)];
+U_NBandAOA=[U_NBandAOA(1:LB-1,:);U_NBandAOA(UB:end,:)];
+W_NBandAOA=[W_NBandAOA(1:LB-1,:);W_NBandAOA(UB:end,:)];
+horizontal_distance_travelled=[horizontal_distance_travelled(1:LB-1,:);horizontal_distance_travelled(UB:end,:)];
 movingDperL=[movingDperL(1:LB-1,:);movingDperL(UB:end,:)];
-NBinLforDPLCalc=[NBinLforDPLCalc(1:LB-1,:);NBinLforDPLCalc(UB:end,:)];
+NB_in_litres=[NB_in_litres(1:LB-1,:);NB_in_litres(UB:end,:)];
 checkAOA0=find(UsefullAOA==0);
 %% Graph stage
 %general change
@@ -206,7 +249,7 @@ Leg=cell(1,1);%Set for legend use
 PNB=[];
 
 for i=1:length(NB)
-plot(UatNBandAOA(LB:end,i),WatNBandAOA(LB:end,i))
+plot(U_NBandAOA(LB:end,i),W_NBandAOA(LB:end,i))
 STRNB2=append('NetB=',num2str(NB(i)),'N');
 Leg{i}=STRNB2;
 end
@@ -214,7 +257,7 @@ end
 % change if need negtive part
 istart=LB+F1P2start;
 for i=istart:istart+5% Here can chane for the amount of AOA lines needed
-plot([0,UatNBandAOA(i,:)],[0,WatNBandAOA(i,:)],'--')
+plot([0,U_NBandAOA(i,:)],[0,W_NBandAOA(i,:)],'--')
 STRAOA2=append('AOA=',num2str(UsefullAOA(i)),'deg');
 Leg{i-istart+1+length(NB)}=STRAOA2;% Continue the Legend after the part1
 end
@@ -229,7 +272,7 @@ hold on
 grid on
 Leg2=cell(1,1);%Set for legend use
 for i=1:length(NB)
-plot(UsefullAOA(LB:end),thetaatNBandAOA(LB:end,i))
+plot(UsefullAOA(LB:end),theta_NBandAOA(LB:end,i))
 STR2=append('NetB=',num2str(NB(i)),'N');
 Leg2{i}=STR2;
 end
@@ -243,7 +286,7 @@ xlabel('AOA alpha deg')
 %%
 figure(3)
 hold on
-contourf(NB,UsefullAOA(LB:end),movingDistance(LB:end,:))
+contourf(NB,UsefullAOA(LB:end),horizontal_distance_travelled(LB:end,:))
 colorbar
 title('The distance per dive m')
 ylabel('AOA alpha deg')
@@ -263,7 +306,7 @@ grid on
 
 AOA1=UsefullAOA(LB:end);
 MDL1=movingDperL(LB:end,:)./1000;
-SpeedNBAOA1=SpeedatNBandAOA(LB:end,:);
+SpeedNBAOA1=velocity_matrix(LB:end,:);
 plot3(MDL1,SpeedNBAOA1,AOA1)
 ylim([0,1])
 xlabel('The distance per dive every Liter change km')
@@ -277,7 +320,7 @@ figure(6)
 hold on
 Leg6=cell(1,1);
 for i=1:length(NB)
-plot(UsefullAOA(LB:end),BetaatNBandAOA(LB:end,i))
+plot(UsefullAOA(LB:end),B_NBandAOA(LB:end,i))
 STR2=append('NetB=',num2str(NB(i)),'N');
 Leg6{i}=STR2;
 end
@@ -300,9 +343,9 @@ for i7=1:length(AOA1)
 STRAOA7=append('AOA=',num2str(AOA1(i7)),'deg');
 Leg7{i7}=STRAOA7;
 end
-L1=LatNBandAOA(AOA1Start:AOA1end,:);
+L1=L_NBandAOA(AOA1Start:AOA1end,:);
 NB1=NB;
-SpeedNBAOA1=SpeedatNBandAOA(AOA1Start:AOA1end,:);
+SpeedNBAOA1=velocity_matrix(AOA1Start:AOA1end,:);
 [Xk,Yk]=meshgrid(NB1,AOA1);
 plot3(L1,SpeedNBAOA1,NB1)
 xlabel('Lift')
@@ -323,14 +366,14 @@ Leg8=cell(1,1);
 PNB=[];
 
 for i=1:length(NB)
-plot(-UatNBandAOA(1:LB-1,i),WatNBandAOA(1:LB-1,i))
+plot(-U_NBandAOA(1:LB-1,i),W_NBandAOA(1:LB-1,i))
 STRNB2=append('NetB=',num2str(NB(i)),'N');
 Leg8{i}=STRNB2;
 end
 
 istart=1+F1P2start;
 for i=LB-istart-5:LB-istart
-plot([0,-UatNBandAOA(i,:)],[0,WatNBandAOA(i,:)],'--')
+plot([0,-U_NBandAOA(i,:)],[0,W_NBandAOA(i,:)],'--')
 STRAOA2=append('AOA=',num2str(UsefullAOA(i)),'deg');
 Leg8{i-(LB-istart-5)+1+length(NB)}=STRAOA2;
 end
@@ -345,7 +388,7 @@ hold on
 grid on
 Leg9=cell(1,1);
 for i=1:length(NB)
-plot(UsefullAOA(1:LB-1),180-thetaatNBandAOA(1:LB-1,i))
+plot(UsefullAOA(1:LB-1),180-theta_NBandAOA(1:LB-1,i))
 STR2=append('NetB=',num2str(NB(i)),'N');
 Leg9{i}=STR2;
 end
@@ -359,7 +402,7 @@ xlabel('AOA alpha deg')
 %% 
 figure(10)
 hold on
-contourf(NB,UsefullAOA(1:LB-1),-movingDistance(1:LB-1,:))
+contourf(NB,UsefullAOA(1:LB-1),-horizontal_distance_travelled(1:LB-1,:))
 colorbar
 title('The distance per rise m')
 ylabel('AOA alpha deg')
@@ -378,7 +421,7 @@ hold on
 grid on
 AOA1=UsefullAOA(1:LB-1);
 MDL1=-movingDperL(1:LB-1,:)./1000;
-SpeedNBAOA1=SpeedatNBandAOA(1:LB-1,:);
+SpeedNBAOA1=velocity_matrix(1:LB-1,:);
 plot3(MDL1,SpeedNBAOA1,AOA1)
 ylim([0,1])
 xlabel('The distance per rise every Liter change km')
@@ -392,7 +435,7 @@ figure(13)
 hold on
 Leg13=cell(1,1);
 for i=1:length(NB)
-    plot(UsefullAOA(1:LB-1),180-BetaatNBandAOA(1:LB-1,i))
+    plot(UsefullAOA(1:LB-1),180-B_NBandAOA(1:LB-1,i))
     STR2=append('NetB=',num2str(NB(i)),'N');
     Leg13{i}=STR2;
 end
@@ -415,9 +458,9 @@ for i14=1:length(AOA1)
 STRAOA14=append('AOA=',num2str(AOA1(i14)),'deg');
 Leg14{i14}=STRAOA14;
 end
-L1=LatNBandAOA(AOA1Start:AOA1end,:);
+L1=L_NBandAOA(AOA1Start:AOA1end,:);
 NB1=NB;
-SpeedNBAOA1=SpeedatNBandAOA(AOA1Start:AOA1end,:);
+SpeedNBAOA1=velocity_matrix(AOA1Start:AOA1end,:);
 [Xk,Yk]=meshgrid(NB1,AOA1);
 plot3(L1,SpeedNBAOA1,NB1)
 %ylim([0,1])
@@ -427,10 +470,10 @@ zlabel('NB')
 title('Positive Part')
 legend(Leg14,'NumColumns',1,'Location','northeast','Box','off')
 %% Energy Calc
-TPCHalf=Depth1./WatNBandAOA;
-DPCHalf=abs(movingDistance);
+TPCHalf=Depth1./W_NBandAOA;
+DPCHalf=abs(horizontal_distance_travelled);
 % DPLHalf=abs(movingDperL)./2;%This need to change as the NB now is coupled
-NBinLHalf=NBinLforDPLCalc;%in L
+NBinLHalf=NB_in_litres;%in L
 AX_EHalf=P1.*TPCHalf;%Ws
 %general calculating the terms
 BEVolume=(Total_NB.*0.1.*2./rho_SW);%m3
