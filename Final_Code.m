@@ -246,7 +246,7 @@ generalYlim=[0,0.2];
 generalXlim=[0,1];
 generalXlim2=[-1,0];
 
-F1P2start = 20; %To adjust the starting point for the 5 polar curves on figure 1 and 8,
+F1P2start = 0; %To adjust the starting point for the 5 polar curves on figure 1 and 8,
 % alter this number, the curves plotted will be in 0.2 degrees increment
 % if u want to have a look at a certain range of angles just keep
 % increasing this variable until you see it.
