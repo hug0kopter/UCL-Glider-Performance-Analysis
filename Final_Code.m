@@ -1,15 +1,15 @@
 clc
 clear all
 close all
-%% Input Constents:(Can run this section seperate to update some constents)
+%% Input Constants:(Run this section if any of the constants need updating)
 
 %general
-rho_SW=1027;
+rho_SW=1027; %salt water density
 WingArea=1.112;%change base on your wing
 
 %Change NB
 %After this line the constents are changeable without rerun the fitting
-Total_NB=14;% Set total capacity of BE
+Total_NB=14;% Total Capacity of the Buoyancy Engine (Neutral Buoyancy)
 NB=[3,4,5,6,7,8,9,10,11];% here is the NB value you want to have a look can change and play
 Depth1=200;% Set target depth
 
