@@ -17,7 +17,7 @@ NB =[3,4,5,6,7,8,9,10,11];% Net buoyancy values for which the lines will be plot
 Depth1 = 200;% Set target depth
 
 %Data Process
-uselessAOARange=[-2.8,-1.2];% Removing the AoA between -2.8 and -1.2 
+uselessAOARange=[-2.8,-];% Removing the AoA between -2.8 and -1.2 
 % because the lift generated is too low causing our glider to fall vertically
 
 %Energy calculation
@@ -246,7 +246,7 @@ generalYlim=[0,0.2];
 generalXlim=[0,1];
 generalXlim2=[-1,0];
 
-F1P2start = 20; %To adjust the starting point for the 5 polar curves on figure 1 and 8,
+F1P2start = 0; %To adjust the starting point for the 5 polar curves on figure 1 and 8,
 % alter this number, the curves plotted will be in 0.2 degrees increment
 % if u want to have a look at a certain range of angles just keep
 % increasing this variable until you see it.
@@ -524,12 +524,12 @@ for iAXE=1:length(AOAN)
 end
 %calculating other further terms
 
-NumOfC_AOAP_AOAN_NB3DMatrix = BatteryE./TotalE_AOAP_AOAN_NB3DMatrix; %number of
-TotalD_AOAP_AOAN_NB3DMatrix = DPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./1000;
-[XAOAN,YAOAP,ZNB] = meshgrid(AOAN,AOAP,NB);
+NumOfC_AOAP_AOAN_NB3DMatrix = BatteryE./TotalE_AOAP_AOAN_NB3DMatrix; %number of cycles 3D matrix
+TotalD_AOAP_AOAN_NB3DMatrix = DPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./1000;% total distance 3D matrix
 
-TotalTime_AOAP_AOAN_NB3DMatrix = TPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./3600./168;
-Power1_AOAP_AOAN_NB3DMatrix = TotalE_AOAP_AOAN_NB3DMatrix./TPC_AOAP_AOAN_NB3DMatrix;
+TotalTime_AOAP_AOAN_NB3DMatrix = TPC_AOAP_AOAN_NB3DMatrix.*NumOfC_AOAP_AOAN_NB3DMatrix./3600./168;% total mission time 3D matrix
+Power1_AOAP_AOAN_NB3DMatrix = TotalE_AOAP_AOAN_NB3DMatrix./TPC_AOAP_AOAN_NB3DMatrix; % Average power draw matrix for each configuration [W]
+[XAOAN,YAOAP,ZNB] = meshgrid(AOAN,AOAP,NB);
 %%Graphic part2
 %%
 %THIS IS A 4D GRAPH
