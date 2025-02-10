@@ -174,7 +174,7 @@ clear
 % loading the fitted curves into the code so that it can be run without 
 % reruning the curve fit every time
 clear
-load('Final_Code_RAM')
+load('Final_Code_RAM.mat')
 if true %run this section to reload the data and run the entire plotting section
 
     if true %run this section only to recalculate all data neccesary for the plots without plotting

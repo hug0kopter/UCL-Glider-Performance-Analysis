@@ -13,7 +13,7 @@ NB=[3,4,5,6,7,8,9,10,11];% here is the NB value you want to have a look can chan
 
 NumberOfSpeed=length(SpeedList);
 TemplateAOA=transpose(linspace(-7,7,15));
-% length(TemplateAOA)
+
 
 TableSpaceRef=zeros(length(TemplateAOA),NumberOfSpeed);
 
