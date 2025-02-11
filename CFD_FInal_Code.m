@@ -17,7 +17,7 @@ NB =[3,4,5,6,7,8,9,10,11];% Net buoyancy values for which the lines will be plot
 Depth1 = 200;% Set target depth
 
 %Data Process
-uselessAOARange=[-2.8,-2];% Removing the AoA between -2.8 and -1.2 
+uselessAOARange=[-1,0];% Removing the AoA between -2.8 and -1.2 
 % because the lift generated is too low causing our glider to fall vertically
 
 %Energy calculation
@@ -34,54 +34,23 @@ SliceControler = 6; %Index of the Net Buoyancy we want to use when descending
 % value of Total_NB, declared above
 
 %% Read Data
-folderPath='Put_The_Data_Here/MECHSPACE_XFLR5/';
+folderPath='Put_The_Data_Here/CFD/';
 FileList=dir(folderPath);
 FileList=FileList(4:end);
-NumberOfFiles=length(FileList);
+SpeedList=[0.3,0.4,0.5,0.6,0.7,0.8,0.9,1];%list of all velocities for which data was collected
 
-% Declaring empty variables, lists and matricies for storage of later results 
-TemplateAOA=transpose(linspace(-10,10,101));
-SpeedList=[]; %list of all velocities for which data was collected
-BlankSpeedList = zeros(1,NumberOfFiles);
-TableSpaceRef = zeros(length(TemplateAOA),NumberOfFiles);
-AoAdebuglist = zeros(length(TemplateAOA),1);
-CD_matrix = zeros(length(TemplateAOA),1); %matrix of coefficient of drag values where one dimension is AoA and other is velocity
-CL_matrix = zeros(length(TemplateAOA),1); %matrix of coefficient of lift  values where one dimension is AoA and other is velocity
+NumberOfSpeed=length(SpeedList);
+TemplateAOA=transpose(linspace(-7,7,15));%AoA range -7~+7
 
-%Read Each File
-for i=1:NumberOfFiles
-    FileName=append(folderPath,FileList(i).name);
-    F1=importdata(FileName);
-
-    % Reading the velocity directly from file name
-    Temp1=split(FileList(i).name,'-');
-    Temp2=split(Temp1(2),' ');
-    Temp3=split(Temp2(1),'_');
-    speed=str2num(cell2mat(append(Temp3(1),'.',Temp3(2))));
-    TempAOA=F1.data(:,1);
-    TempCD=F1.data(:,6);
-    TempCL=F1.data(:,3);
-
-    %Find the starting point of the AOA data
-    for j=1:101
-        R1=round(TemplateAOA(j),3);
-        R2=round(TempAOA(1),3);
-        if R1==R2
-            j1=j;
-            break
-        end    
-    end
-    %appending data from each file onto the matricies
-    SpeedList=[SpeedList,speed];
-    AoAdebuglist=[AoAdebuglist,[AoAdebuglist(1:j1-1,i);TempAOA;AoAdebuglist(j1+length(TempCD):length(TemplateAOA),i)]];
-    CD_matrix = [CD_matrix,[CD_matrix(1:j1-1,i);TempCD;CD_matrix(j1+length(TempCD):length(TemplateAOA),i)]];
-    CL_matrix = [CL_matrix,[CL_matrix(1:j1-1,i);TempCL;CL_matrix(j1+length(TempCD):length(TemplateAOA),i)]];
-    
-end
-%Remove the first row of data as it is 0 in the dataset
-AoAdebuglist(:,1)=[];
-CD_matrix(:,1)=[];
-CL_matrix(:,1)=[];
+TableSpaceRef=zeros(length(TemplateAOA),NumberOfSpeed);
+% Assemble the file name for read
+FileName1=append(folderPath,FileList(1).name);
+FileName2=append(folderPath,FileList(2).name);
+FileName3=append(folderPath,FileList(3).name);
+%Read the prepared tables
+AoAdebuglist=importdata(FileName1);
+CD_matrix=importdata(FileName2);
+CL_matrix=importdata(FileName3);
 
 %Calculating temporary matricies to be multiplied by velocity at a later
 %stage
@@ -109,72 +78,60 @@ NB_Speed_Relationship = repmat(struct(),[length(TemplateAOA),1]);
 UsefullAOARange=[];
 for i=1:length(TemplateAOA)
     NB_line = net_buoyancy_matrix(i,:); % read each line of the net buoyancy matrix
-
-    % Checking if the line is not empty (BlankSpeedList is full of zeros)
-    if NB_line ~= BlankSpeedList
-        
-        %Finding indexes of all non-zero values
-        kN0 = find(NB_line); %storing indexes of zero values in a list
-
-        %If more than half of NB_line is not zeros
-        if length(kN0) >= 1/2*length(SpeedList)
-
-            %Using only the lines between the iteration 16 and 86 as they
-            %correspond to the -7 degrees to 7 degress AoA range we are
-            %interested in
-            if i>16 && i<86
-
-                %Saving the valid aoa range
-                UsefullAOARange=[UsefullAOARange,i];
-
-                %Set up the curve fitting environment
-                y = transpose(SpeedList);
-                y2 = transpose(lift_matrix(i,:));
-                x = transpose(net_buoyancy_matrix(i,:));
-
-                %Exponential fit for a relationship between Speed and net
-                %buoyancy, for the current angle of attack at current
-                %iteration
-                f = fittype('a1*exp(b1*x) + a2*exp(b2*x) ');
-
-                %Defining the starting points of the fit for our dataset,
-                %this was determined using datafitting toolbox
-                start_point = [0.895, 0.1672, -0.1, -1]; 
-                
-                fit_options = fitoptions('Method','NonlinearLeastSquares','StartPoint', start_point,'Algorithm','Levenberg-Marquardt');
-                [fit_result, gof] = fit(x, y, f, fit_options); %Fitting the curve
-                disp(fit_result); %displaying the equation of the currently fitted curve
-                plot(fit_result,x,y); %showing the fitting plot for visual inspection
-
-                %Save the fit function
-                NB_Speed_Relationship(i).FitFunction = fit_result;
-                disp('Please check the fit result') % printing a line after each curve fit for debugging
-
-                %Linear fit to find the relationship between lift and
-                %velocity at the angle of attack of the current loop
-                %iteration
-                f2 = fittype('poly1');
-                [fit_result2, gof2] = fit(x, y2, f2);
-                disp(fit_result2); %displaying the equation of the second fit
-                plot(fit_result2,x,y2); %showing the fitting plot for visual inspection
-
-                %Save the fit function
-                NB_Speed_Relationship(i).FitFunction2 = fit_result2;
-                disp('Please check the fit result2') % printing a line after each curve fit for debugging
-            end
-        end
+    %Saving the valid aoa range
+    UsefullAOARange=[UsefullAOARange,i];
+    %Set up the curve fitting environment
+    y = transpose(SpeedList);
+    y2 = transpose(lift_matrix(i,:));
+    x = transpose(net_buoyancy_matrix(i,:));
+    if i==7 %Manual overwrite correction for fit this case
+        xu=[x(1);x(2);x(3);x(5)];
+        y2u=[y2(1);y2(2);y2(3);y2(5)];
     end
+    %Exponential fit for a relationship between Speed and net
+    %buoyancy, for the current angle of attack at current
+    %iteration
+    f = fittype('a1*exp(b1*x) + a2*exp(b2*x) ');
+
+    %Defining the starting points of the fit for our dataset,
+    %this was determined using datafitting toolbox
+    start_point = [-0.4, 0.5, 0, 0]; 
+
+    fit_options = fitoptions('Method','NonlinearLeastSquares','StartPoint', start_point,'Algorithm','Levenberg-Marquardt');
+    [fit_result, gof] = fit(x, y, f, fit_options); %Fitting the curve
+    disp(fit_result); %displaying the equation of the currently fitted curve
+    plot(fit_result,x,y); %showing the fitting plot for visual inspection
+
+    %Save the fit function
+    NB_Speed_Relationship(i).FitFunction = fit_result;
+    disp('Please check the fit result') % printing a line after each curve fit for debugging
+
+    %Linear fit to find the relationship between lift and
+    %velocity at the angle of attack of the current loop
+    %iteration
+    f2 = fittype('poly1');
+    if i==7
+        [fit_result2, gof2] = fit(xu, y2u, f2); 
+    else
+        [fit_result2, gof2] = fit(x, y2, f2); 
+    end
+    disp(fit_result2); %displaying the equation of the second fit
+    plot(fit_result2,x,y2); %showing the fitting plot for visual inspection
+
+    %Save the fit function
+    NB_Speed_Relationship(i).FitFunction2 = fit_result2;
+    disp('Please check the fit result2') % printing a line after each curve fit for debugging
 end
 %Save everything into RAM file to save time on doing fitting
 close all 
-save('Final_Code_RAM')
+save('CFD_Final_Code_RAM')
 clear
 
 %%
 % loading the fitted curves into the code so that it can be run without 
 % reruning the curve fit every time
 clear
-load('Final_Code_RAM.mat')
+load('CFD_Final_Code_RAM.mat')
 if true %run this section to reload the data and run the entire plotting section
 
     if true %run this section only to recalculate all data neccesary for the plots without plotting
@@ -182,8 +139,8 @@ if true %run this section to reload the data and run the entire plotting section
 close all
 
 UsefullAOARange = UsefullAOARange(1:end);% for debugging
-UsefullAOA = TemplateAOA(UsefullAOARange); % Range of AoA we interested in (-7 to 7) and excluding the empty results
-UsefullNBSR = NB_Speed_Relationship(UsefullAOARange); % Taking only the fitted curves which correspond with AoA's of interest
+UsefullAOA = TemplateAOA;%(UsefullAOARange); % Range of AoA we interested in (-7 to 7) and excluding the empty results
+UsefullNBSR = NB_Speed_Relationship;%(UsefullAOARange); % Taking only the fitted curves which correspond with AoA's of interest
 
 %Declare empty matricies for data to be appended later
 velocity_matrix = zeros(length(UsefullAOA),length(NB)); % matrix of velocities with dimensions of net buoyancy and Aoa
@@ -213,7 +170,7 @@ for i=1:length(NB) % for each net buoyancy value
 end
 
 %Find the seperation between Pos and Neg
-UsefullAOA = round(UsefullAOA,3);
+%UsefullAOA = round(UsefullAOA,3);
 LB = find(UsefullAOA==uselessAOARange(1)); % Lower boundary of the AoA range (Separation point right before the lowest AoA when diving)
 UB = find(UsefullAOA==uselessAOARange(2)); % Upper boundary of the AoA range
 
@@ -352,8 +309,8 @@ figure(7)
 hold on
 grid on
 Leg7=cell(1,1);
-AOA1Start=LB+10;
-AOA1end=LB+17;
+AOA1Start=LB;
+AOA1end=LB+7;
 AOA1=UsefullAOA(AOA1Start:AOA1end);
 for i7=1:length(AOA1)
 STRAOA7=append('AOA=',num2str(AOA1(i7)),'deg');
@@ -362,7 +319,7 @@ end
 L1=L_NBandAOA(AOA1Start:AOA1end,:);
 NB1=NB;
 SpeedNBAOA1=velocity_matrix(AOA1Start:AOA1end,:);
-[Xk,Yk]=meshgrid(NB1,AOA1);
+%[Xk,Yk]=meshgrid(NB1,AOA1);
 plot3(L1,SpeedNBAOA1,NB1)
 xlabel('Lift')
 ylabel('General Speed m/s')
@@ -467,8 +424,8 @@ figure(14)
 hold on
 grid on
 Leg14=cell(1,1);
-AOA1Start=LB-17;
-AOA1end=LB-10;
+AOA1Start=LB-6;
+AOA1end=LB-1;
 AOA1=UsefullAOA(AOA1Start:AOA1end);
 for i14=1:length(AOA1)
 STRAOA14=append('AOA=',num2str(AOA1(i14)),'deg');
@@ -477,7 +434,7 @@ end
 L1=L_NBandAOA(AOA1Start:AOA1end,:);
 NB1=NB;
 SpeedNBAOA1=velocity_matrix(AOA1Start:AOA1end,:);
-[Xk,Yk]=meshgrid(NB1,AOA1);
+%[Xk,Yk]=meshgrid(NB1,AOA1);
 plot3(L1,SpeedNBAOA1,NB1)
 %ylim([0,1])
 xlabel('Lift')
