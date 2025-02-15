@@ -22,6 +22,7 @@ uselessAOARange=[-2.8,-2];% Removing the AoA between -2.8 and -1.2
 
 %Energy calculation
 P1 = 1.2; %ambient power draw from electronics (not including actuators) [W]
+PandRPC1=71928; %Pitch and Roll Energy per dive and rise [Ws]
 PressureSurface = 1e5; %Atmospheric pressure at water surface
 PressureBottom = 21e5; %Water pressure at maximum depth
 EtaBE = 0.35; %buoyancy engine efficiency - our estimate
@@ -517,7 +518,7 @@ for iAXE=1:length(AOAN)
     tempDPL = tempDPC./Total_NB;
     tempTPC = TPC_AOAP_NB + fliplr(TPC_AOAN_NB(iAXE,:));
     AXE_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempAXE;
-    TotalE_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempAXE + BE_E;
+    TotalE_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempAXE + BE_E + PandRPC1;
     DPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempDPC;
     DPL_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempDPL;
     TPC_AOAP_AOAN_NB3DMatrix(:,iAXE,:) = tempTPC;
